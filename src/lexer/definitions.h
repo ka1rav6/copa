@@ -1,5 +1,5 @@
-#ifndef FUNCTION_H
-#define FUNCTION_H
+#ifndef DEFINITIONS_H
+#define DEFINITIONS_H
 
 #include <string>
 #include <vector>
@@ -10,10 +10,10 @@
 struct Parameter{
     std::string dataType;
     std::optional<std::string> param_name;
-    Parameter(std::string type){
+    Parameter(const std::string& type){
         this->dataType = type;
     }
-    Parameter(std::string type, std::string name){
+    Parameter(const std::string& type, const std::string& name){
         this->dataType   = type;
         this->param_name = name;
     }
@@ -29,21 +29,22 @@ struct Function{
     std::string name;
     std::vector<Parameter> params;
     std::string returnType;
-    uint8_t flags;
-    Function(std::string name, 
+    uint8_t flags = 0;
+    Function(const std::string& name, 
              std::vector<Parameter> params,
-             std::string returnType
+             const std::string& returnType
             ){
         this->name       = name;
         this->params     = std::move(params);
         this->returnType = returnType;
+        this->flags      = 0;
     }
 };
 
 struct EnumField{
     std::string name;
     std::optional<std::string> value;
-    EnumField(std::string name, std::string value){
+    EnumField(const std::string& name, const std::string& value){
         this->name  = name;
         this->value = value;
     }
@@ -52,7 +53,7 @@ struct EnumField{
 struct Enum{
     std::string name;
     std::vector<EnumField> fields;
-    Enum(std::string name, std::vector<EnumField> fields){
+    Enum(const std::string& name, std::vector<EnumField> fields){
         this->name   = name;
         this->fields = std::move(fields);
     }
@@ -61,8 +62,8 @@ struct Enum{
 struct ExternVariable{
     std::string type;
     std::string name;
-    ExternVariable(std::string type,
-                   std::string name
+    ExternVariable(const std::string& type,
+                   const std::string& name
                   ){
         this->type = type;
         this->name = name;
@@ -72,8 +73,8 @@ struct ExternVariable{
 struct StructField{
     std::string type;
     std::string name;
-    StructField(std::string type,
-                std::string name                
+    StructField(const std::string& type,
+                const std::string& name                
                ){
         this->type = type;
         this->name = name;
@@ -83,7 +84,7 @@ struct StructField{
 struct Struct{
     std::string name;
     std::vector<StructField> fields; // as C structs have no initalization
-    Struct(std::string name,
+    Struct(const std::string& name, 
            std::vector<StructField> fields
           ){
         this->name   = name;
@@ -93,4 +94,4 @@ struct Struct{
 
 
 
-#endif // FUNCTION_H
+#endif // DEFINITIONS_H
