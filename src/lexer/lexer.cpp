@@ -17,5 +17,10 @@ std::vector<std::string> read_file(std::string fileName) {
 }
 
 void tokenise_line(std::string line) {
-    // TODO: implement tokenisation
+    for (size_t i = 0; i < line.size(); ++i){
+        char ch = line[i];
+
+
+    }
 }
+
