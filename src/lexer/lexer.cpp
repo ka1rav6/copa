@@ -100,20 +100,16 @@ static std::vector<Token> handle_preprocessor_directives(
         return tokenise_include(line, line_num, i);
     if (directive == "define")
         return tokenise_define(line, line_num, i);
-
     return tokenise_unknown_directive(line, line_num);
 }
 
 std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
-    if (line.size() == 0) {
+    if (line.size() == 0)
         return {};
-    }
-
-    if (line.at(0) == '#') {
+    if (line.at(0) == '#'){
         size_t i = 1;
         return handle_preprocessor_directives(line, line_num, &i);
     }
-
     return {};
 } 
 

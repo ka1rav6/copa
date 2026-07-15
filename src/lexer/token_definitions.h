@@ -10,6 +10,7 @@
 
 namespace Lexer{
 
+// bitmasked flags for variables and functions
 enum Flags : uint8_t {
     isStatic   = 1 << 0,
     isExtern   = 1 << 1,
@@ -162,8 +163,8 @@ struct Macro {
 };
 
 struct IncludeStatement{
-    bool system;
     std::string path;
+    bool system;
     IncludeStatement(
             bool system,
             std::string path
@@ -174,7 +175,7 @@ struct IncludeStatement{
 
 enum class ForwardKind {
     Struct,
-    Union,
+    Union ,
     Enum
 };
 
@@ -202,63 +203,67 @@ struct Comment {
 
 using Declaration =
     std::variant<
-        Function,
-        Struct,
-        Union,
-        Enum,
-        Typedef,
-        Macro,
-        IncludeStatement,
-        ExternVariable,
+        Function          ,
+        Struct            ,
+        Union             ,
+        Enum              ,
+        Typedef           ,
+        Macro             ,
+        IncludeStatement  ,
+        ExternVariable    ,
         VariableDefinition,
-        ForwardDeclaration>;
+        ForwardDeclaration
+    >;
 
-enum class Symbols: uint8_t {
-    LPAREN,                // (
-    RPAREN,                // )
-    START_MULTICOMMENT,    // /*
-    HASHTAG,               // #
-    END_MULTICOMMENT,      // */
-    LSQUARE,               // [
-    RSQUARE,               // ]
-    LCURLY,                // {
-    RCURLY,                // }
-    SEMICOLON,             // ;
-    COLON,                 // :
-    PLUS,                  // +
-    PLUSPLUS,              // ++
-    MINUS,                 // -
-    MINUSMINUS,            // --
-    ASTRISK,               // *
-    EQUAL,                 // =
-    DBL_EQUAL,             // ==
-    NOT_EQUAL,             // !=
-    DIVIDE,                // /
-    SINGLE_COMMENT,        // //
-    SINGLE_QUOTE,          // '
-    DOUBLE_QUOTE,          // "
-    COMMA,                 // ,
-    QSN_MARK,              // ?
-    LT,                    // <
-    GT,                    // >
-    GE,                    // >=
-    LE,                    // <=
-    NEXT_LINE,             // \n
-    EOF_,                  // EOF
-    AND,                   // &
-    ANDAND,                // &&
-    OR,                    // |
-    OROR,                  // ||
-    LOG_NOT,               // !
-    BIN_NOT,               // ~
-    PTR_NOTATION,          // ->
+enum class Symbols : uint8_t {
+    // ------- Brackets -------
+    LPAREN,                     // (
+    RPAREN,                     // )
+    LSQUARE,                    // [            
+    RSQUARE,                    // ]             
+    LCURLY,                     // {         
+    RCURLY,                     // }        
+    // ------- Comments --------
+    START_MULTICOMMENT,         // /*                     
+    END_MULTICOMMENT,           // */                     
+    SINGLE_COMMENT,             // //                 
+    // ------ Arithmetic --------
+    PLUS,                       // +         
+    PLUSPLUS,                   // ++             
+    MINUS,                      // -         
+    MINUSMINUS,                 // --             
+    ASTRISK,                    // *             
+    DIVIDE,                     // /         
+    EQ,                         // =     
+    EQ_EQ,                      // ==         
+    NE,                         // !=     
+    LT,                         // <     
+    GT,                         // >     
+    GE,                         // >=     
+    LE,                         // <=   
+    AND,                        // &         
+    ANDAND,                     // &&         
+    OR,                         // |     
+    OROR,                       // ||         
+    LOG_NOT,                    // !             
+    BIN_NOT,                    // ~             
+    PTR_NOTATION,               // ->                 
+    // ------ Punctuation -------
+    SINGLE_QUOTE,               // '                 
+    DOUBLE_QUOTE,               // "                 
+    COMMA,                      // ,         
+    QSN_MARK,                   // ?             
+    NEXT_LINE,                  // \n             
+    EOF_,                       // EOF         
+    SEMICOLON,                  // ;             
+    COLON,                      // :         
 };
 
 struct Token {
     std::optional<Declaration> decl;
     std::optional<Symbols> symbol;
     std::string raw;
-    size_t col_num;
+    size_t col_num ;
     size_t line_num;
 };
 
