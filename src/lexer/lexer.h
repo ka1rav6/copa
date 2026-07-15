@@ -3,8 +3,9 @@
 
 #include <string>
 #include <vector>
+#include "token_definitions.h"
 
 std::vector<std::string> read_file(std::string fileName);
-void tokenise_line(std::string line);
+Declaration tokenise_line(std::string line, size_t line_num);
 
 #endif // LEXER_H
