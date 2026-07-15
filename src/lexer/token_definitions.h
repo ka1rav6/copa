@@ -11,20 +11,19 @@
 namespace Lexer{
 
 enum Flags : uint8_t {
-    isStatic   = 1 << 0, // for functions
-    isExtern   = 1 << 1, // for functions and variables
-    isTypedef  = 1 << 2, // for structs, type etc.
-    isVolitile = 1 << 3, // for type
-    isSigned   = 1 << 4, // for type
-    isConst    = 1 << 5, // for type
+    isStatic   = 1 << 0,
+    isExtern   = 1 << 1,
+    isTypedef  = 1 << 2,
+    isVolitile = 1 << 3,
+    isSigned   = 1 << 4,
+    isConst    = 1 << 5,
 };
 
 struct Type {
     std::string baseType;
-    uint32_t pointerLevel = 0; // number of *
+    uint32_t pointerLevel = 0;
     uint64_t flags        = 0;
 };
-
 
 struct Parameter {
     Type dataType;
@@ -119,8 +118,6 @@ struct VariableDefinition {
           value(std::move(value)) {}
 };
 
-
-
 struct Typedef{
     Type underlyingType;
     std::string alias;
@@ -186,8 +183,6 @@ struct ForwardDeclaration {
     std::string name;
 };
 
-
-
 struct FunctionPointer {
     Type returnType;
     std::string name;
@@ -218,5 +213,55 @@ using Declaration =
         VariableDefinition,
         ForwardDeclaration>;
 
-}
-#endif // DEFINITIONS_H
+enum class Symbols: uint8_t {
+    LPAREN,                // (
+    RPAREN,                // )
+    START_MULTICOMMENT,    // /*
+    HASHTAG,               // #
+    END_MULTICOMMENT,      // */
+    LSQUARE,               // [
+    RSQUARE,               // ]
+    LCURLY,                // {
+    RCURLY,                // }
+    SEMICOLON,             // ;
+    COLON,                 // :
+    PLUS,                  // +
+    PLUSPLUS,              // ++
+    MINUS,                 // -
+    MINUSMINUS,            // --
+    ASTRISK,               // *
+    EQUAL,                 // =
+    DBL_EQUAL,             // ==
+    NOT_EQUAL,             // !=
+    DIVIDE,                // /
+    SINGLE_COMMENT,        // //
+    SINGLE_QUOTE,          // '
+    DOUBLE_QUOTE,          // "
+    COMMA,                 // ,
+    QSN_MARK,              // ?
+    LT,                    // <
+    GT,                    // >
+    GE,                    // >=
+    LE,                    // <=
+    NEXT_LINE,             // \n
+    EOF_,                  // EOF
+    AND,                   // &
+    ANDAND,                // &&
+    OR,                    // |
+    OROR,                  // ||
+    LOG_NOT,               // !
+    BIN_NOT,               // ~
+    PTR_NOTATION,          // ->
+};
+
+struct Token {
+    std::optional<Declaration> decl;
+    std::optional<Symbols> symbol;
+    std::string raw;
+    size_t col_num;
+    size_t line_num;
+};
+
+} // namespace Lexer
+
+#endif
