@@ -6,11 +6,10 @@
 #include "token_definitions.h"
 
 namespace Lexer{
-std::vector<std::string> read_file(std::string fileName);
-Declaration tokenise_line(std::string line, size_t line_num);
 
+std::vector<std::string> read_file(const std::string& fileName);
+std::vector<Token> tokenise_line(const std::string& line, size_t line_num);
 
 }
-
 
 #endif // LEXER_H
