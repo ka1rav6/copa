@@ -12,11 +12,11 @@ add_library(parser
 )
 
 # Target for the full executable (add main.cpp later)
-add_executable(give-head
+add_executable(copa
     main.cpp
 )
 
-target_link_libraries(give-head
+target_link_libraries(copa
     PRIVATE
         lexer
         generator
@@ -35,7 +35,7 @@ target_include_directories(parser
         ${CMAKE_CURRENT_SOURCE_DIR}/logger
 )
 
-target_include_directories(give-head
+target_include_directories(copa
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/lexer
         ${CMAKE_CURRENT_SOURCE_DIR}/generator

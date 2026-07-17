@@ -4,7 +4,7 @@
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: give-head <file.c>" << std::endl;
+        std::cerr << "Usage: copa <file.c>" << std::endl;
         return 1;
     }
 
