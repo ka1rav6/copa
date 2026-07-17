@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "logx_linux.h"
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
@@ -12,6 +13,11 @@ namespace Parser {
 std::vector<Lexer::Token> flatten_tokens(
     const std::vector<std::vector<Lexer::Token>>& line_tokens)
 {
+    size_t total = 0;
+    for (const auto& line : line_tokens) total += line.size();
+    LOGX_DEBUG << "flattening " << line_tokens.size() << " lines, "
+               << total << " raw tokens";
+
     std::vector<Lexer::Token> out;
     for (const auto& line : line_tokens) {
         for (const auto& tok : line) {
@@ -22,6 +28,8 @@ std::vector<Lexer::Token> flatten_tokens(
             out.push_back(tok);
         }
     }
+    LOGX_DEBUG << "flattened to " << out.size() << " tokens (stripped "
+               << (total - out.size()) << " comments/newlines)";
     return out;
 }
 
@@ -121,12 +129,30 @@ static Lexer::Type parse_type(Parser& p) {
         const std::string& w = p.peek().raw;
 
         // Qualifiers / storage classes that set flags
-        if      (w == "const")    { type.flags |= Lexer::Flags::isConst;    p.advance(); }
-        else if (w == "volatile") { type.flags |= Lexer::Flags::isVolitile; p.advance(); }
-        else if (w == "static")   { type.flags |= Lexer::Flags::isStatic;   p.advance(); }
-        else if (w == "extern")   { type.flags |= Lexer::Flags::isExtern;   p.advance(); }
-        else if (w == "signed")   { type.flags |= Lexer::Flags::isSigned;   p.advance(); }
-        else if (w == "unsigned") { type.baseType += "unsigned ";            p.advance(); }
+        if      (w == "const")    {
+            type.flags |= Lexer::Flags::isConst;
+            p.advance();
+        }
+        else if (w == "volatile") {
+            type.flags |= Lexer::Flags::isVolitile;
+            p.advance();
+        }
+        else if (w == "static")   {
+            type.flags |= Lexer::Flags::isStatic;
+            p.advance();
+        }
+        else if (w == "extern")   {
+            type.flags |= Lexer::Flags::isExtern;
+            p.advance();
+        }
+        else if (w == "signed")   {
+            type.flags |= Lexer::Flags::isSigned;
+            p.advance();
+        }
+        else if (w == "unsigned") {
+            type.baseType += "unsigned ";
+            p.advance();
+        }
         // Type-name keywords: int, char, void, double, float, long, short, etc.
         else if (is_type_keyword(w)) {
             if (!type.baseType.empty() && type.baseType.back() != ' ')
@@ -173,16 +199,17 @@ static Lexer::Type parse_type(Parser& p) {
 // ---------------------------------------------------------------------------
 // Parameter list parsing
 // ---------------------------------------------------------------------------
-
 static std::vector<Lexer::Parameter> parse_param_list(Parser& p) {
     std::vector<Lexer::Parameter> params;
     p.expect(Lexer::TokenKind::LPAREN, "expected '('");
+    LOGX_DEBUG << "        parse_param_list: entered";
 
     // (void) means empty parameter list
     if (p.check_kw("void")) {
         size_t saved = p.pos;
         p.advance();
         if (p.check(Lexer::TokenKind::RPAREN)) {
+            LOGX_DEBUG << "        parse_param_list: (void) -> 0 params";
             p.advance();
             return params;
         }
@@ -190,6 +217,7 @@ static std::vector<Lexer::Parameter> parse_param_list(Parser& p) {
     }
 
     if (p.check(Lexer::TokenKind::RPAREN)) {
+        LOGX_DEBUG << "        parse_param_list: empty () -> 0 params";
         p.advance();
         return params;
     }
@@ -197,6 +225,7 @@ static std::vector<Lexer::Parameter> parse_param_list(Parser& p) {
     while (!p.at_end() && !p.check(Lexer::TokenKind::RPAREN)) {
         // Handle variadic: ...
         if (p.check(Lexer::TokenKind::ELLIPSIS)) {
+            LOGX_DEBUG << "        parse_param_list: found variadic ...";
             p.advance();
             break;
         }
@@ -215,7 +244,10 @@ static std::vector<Lexer::Parameter> parse_param_list(Parser& p) {
             param_type.pointerLevel++;
         }
 
+        LOGX_DEBUG << "        parse_param_list: param " << params.size() << " = "
+                   << param_type.baseType << (param_name ? " " + *param_name : " (unnamed)");
         params.emplace_back(std::move(param_type), std::move(param_name));
+
         if (!p.match(Lexer::TokenKind::COMMA))
             break;
     }
@@ -275,6 +307,7 @@ static Lexer::Declaration parse_preprocessor(Parser& p) {
         end++;
 
     std::string directive = raw.substr(start, end - start);
+    LOGX_DEBUG << "    preprocessor directive: " << directive;
 
     if (directive == "include") {
         size_t rest = end;
@@ -287,6 +320,7 @@ static Lexer::Declaration parse_preprocessor(Parser& p) {
             size_t path_end = raw.find(delim, path_start);
             if (path_end == std::string::npos) path_end = raw.size();
             std::string path = raw.substr(path_start, path_end - path_start);
+            LOGX_DEBUG << "    include path: " << path << (system ? " (system)" : " (local)");
             return Lexer::IncludeStatement(system, std::move(path));
         }
     }
@@ -302,6 +336,7 @@ static Lexer::Declaration parse_preprocessor(Parser& p) {
             rest++;
 
         std::string name = raw.substr(name_start, rest - name_start);
+        LOGX_DEBUG << "    macro name: " << name;
 
         std::optional<std::string> params;
         while (rest < raw.size() && (raw[rest] == ' ' || raw[rest] == '\t'))
@@ -382,6 +417,7 @@ static Lexer::Declaration parse_struct_or_union(Parser& p) {
     if (p.check(Lexer::TokenKind::IDENTIFIER))
         name = p.advance().raw;
 
+    LOGX_DEBUG << "    parsing " << (is_struct ? "struct" : "union") << " " << name;
     p.expect(Lexer::TokenKind::LCURLY, "expected '{'");
 
     if (is_struct) {
@@ -450,6 +486,7 @@ static Lexer::Declaration parse_enum(Parser& p) {
     if (p.check(Lexer::TokenKind::IDENTIFIER))
         name = p.advance().raw;
 
+    LOGX_DEBUG << "      parsing enum " << name;
     p.expect(Lexer::TokenKind::LCURLY, "expected '{'");
 
     std::vector<Lexer::EnumField> fields;
@@ -462,10 +499,13 @@ static Lexer::Declaration parse_enum(Parser& p) {
         if (p.match(Lexer::TokenKind::EQUALS))
             value = parse_expression(p);
 
+        LOGX_DEBUG << "        enum field: " << field_name
+                   << (value ? " = " + *value : "");
         fields.emplace_back(std::move(field_name), std::move(value));
         p.match(Lexer::TokenKind::COMMA);
     }
 
+    LOGX_DEBUG << "      enum " << name << " has " << fields.size() << " fields";
     p.expect(Lexer::TokenKind::RCURLY, "expected '}'");
     p.match(Lexer::TokenKind::SEMICOLON);
     return Lexer::Enum(std::move(name), std::move(fields));
@@ -477,6 +517,7 @@ static Lexer::Declaration parse_enum(Parser& p) {
 
 static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
     p.advance(); // typedef
+    LOGX_DEBUG << "    parse_typedef: entered";
 
     size_t saved = p.pos;
 
@@ -497,6 +538,7 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
                 std::string alias = p.advance().raw;
                 p.expect(Lexer::TokenKind::RPAREN, "expected ')'");
                 auto params = parse_param_list(p);
+                LOGX_DEBUG << "    parse_typedef: function pointer -> " << alias;
                 p.match(Lexer::TokenKind::SEMICOLON);
                 decls.push_back(Lexer::FunctionPointer{std::move(underlying), std::move(alias), std::move(params)});
                 return;
@@ -504,13 +546,13 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
         }
     }
 
-    // Anonymous struct/union with body: typedef struct { ... } Name;
+    // Anonymous struct/union/enum with body: typedef struct { ... } Name;
     // Also handles: typedef struct tag { ... } Name;
     if ((underlying.baseType == "struct" || underlying.baseType == "union" ||
-         underlying.baseType == "enum" ||
-         underlying.baseType.find("struct ") == 0 ||
-         underlying.baseType.find("union ") == 0 ||
-         underlying.baseType.find("enum ") == 0) &&
+        underlying.baseType == "enum" ||
+        underlying.baseType.find("struct ") == 0 ||
+        underlying.baseType.find("union ") == 0 ||
+        underlying.baseType.find("enum ") == 0) &&
         p.check(Lexer::TokenKind::LCURLY))
     {
         p.pos = saved;
@@ -521,10 +563,12 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
             underlying.baseType.find("union ") == 0;
 
         if (is_struct_or_union) {
+            LOGX_DEBUG << "    parse_typedef: struct/union body -> typedef alias";
             decls.push_back(parse_struct_or_union(p));
             std::string alias;
             if (p.check(Lexer::TokenKind::IDENTIFIER))
                 alias = p.advance().raw;
+            LOGX_DEBUG << "    parse_typedef: alias = " << alias;
             p.match(Lexer::TokenKind::SEMICOLON);
             decls.push_back(Lexer::Typedef(
                 Lexer::Type{underlying.baseType, 0, 0},
@@ -533,6 +577,7 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
         }
 
         // Anonymous enum body
+        LOGX_DEBUG << "    parse_typedef: anonymous enum body";
         p.advance(); // enum
         if (p.check(Lexer::TokenKind::IDENTIFIER))
             p.advance();
@@ -555,6 +600,7 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
         std::string alias;
         if (p.check(Lexer::TokenKind::IDENTIFIER))
             alias = p.advance().raw;
+        LOGX_DEBUG << "    parse_typedef: enum alias = " << alias;
         p.match(Lexer::TokenKind::SEMICOLON);
 
         decls.push_back(Lexer::Enum(std::move(enum_name), std::move(fields)));
@@ -572,6 +618,7 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
         std::string alias;
         if (p.check(Lexer::TokenKind::IDENTIFIER))
             alias = p.advance().raw;
+        LOGX_DEBUG << "    parse_typedef: named tag " << underlying.baseType << " -> " << alias;
         p.match(Lexer::TokenKind::SEMICOLON);
         decls.push_back(Lexer::Typedef(std::move(underlying), std::move(alias)));
         return;
@@ -590,17 +637,21 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
 // ---------------------------------------------------------------------------
 
 static Lexer::Declaration parse_variable(Parser& p, Lexer::Type type, std::string name) {
+    LOGX_DEBUG << "      parse_variable: " << type.baseType << " " << name;
+
     // Array: type name[expr]
     if (p.check(Lexer::TokenKind::LSQUARE)) {
         p.advance();
         parse_expression(p); // size
         p.expect(Lexer::TokenKind::RSQUARE, "expected ']'");
         type.pointerLevel++;
+        LOGX_DEBUG << "      parse_variable: array, pointerLevel=" << type.pointerLevel;
     }
 
     // Optional initializer
     if (p.match(Lexer::TokenKind::EQUALS)) {
         std::string value = parse_expression(p);
+        LOGX_DEBUG << "      parse_variable: initializer = " << value;
         p.match(Lexer::TokenKind::SEMICOLON);
         return Lexer::VariableDefinition(std::move(type), std::move(name), std::move(value));
     }
@@ -614,18 +665,22 @@ static Lexer::Declaration parse_variable(Parser& p, Lexer::Type type, std::strin
 // ---------------------------------------------------------------------------
 
 static Lexer::Declaration parse_function(Parser& p, Lexer::Type return_type, std::string name) {
+    LOGX_DEBUG << "      parsing function: " << return_type.baseType << " " << name << "()";
     auto params = parse_param_list(p);
+    LOGX_DEBUG << "      function has " << params.size() << " parameters";
 
     while (p.check_kw("const") || p.check_kw("volatile") ||
            p.check_kw("static") || p.check_kw("extern"))
         p.advance();
 
     if (p.check(Lexer::TokenKind::SEMICOLON)) {
+        LOGX_DEBUG << "      function declaration (prototype)";
         p.advance();
         return Lexer::Function(std::move(name), std::move(params), std::move(return_type));
     }
 
     if (p.check(Lexer::TokenKind::LCURLY)) {
+        LOGX_DEBUG << "      function definition, skipping body";
         // Skip function body
         int depth = 0;
         do {
@@ -648,12 +703,14 @@ static void parse_top_level(Parser& p, std::vector<Lexer::Declaration>& decls) {
 
     // Preprocessor directive
     if (p.check(Lexer::TokenKind::PREPROCESSOR)) {
+        LOGX_DEBUG << "  parsing PREPROCESSOR at token " << p.pos;
         decls.push_back(parse_preprocessor(p));
         return;
     }
 
     // Forward declaration: struct Foo;
     if (looks_like_forward_decl(p)) {
+        LOGX_DEBUG << "  parsing FORWARD_DECL at token " << p.pos;
         std::string keyword = p.advance().raw;
         std::string tag = p.advance().raw;
         p.advance(); // semicolon
@@ -668,6 +725,7 @@ static void parse_top_level(Parser& p, std::vector<Lexer::Declaration>& decls) {
 
     // typedef
     if (p.check_kw("typedef")) {
+        LOGX_DEBUG << "  parsing TYPEDEF at token " << p.pos;
         parse_typedef(p, decls);
         return;
     }
@@ -681,6 +739,7 @@ static void parse_top_level(Parser& p, std::vector<Lexer::Declaration>& decls) {
         bool has_body = p.check(Lexer::TokenKind::LCURLY);
         p.pos = saved;
         if (has_body) {
+            LOGX_DEBUG << "  parsing STRUCT/UNION definition at token " << p.pos;
             decls.push_back(parse_struct_or_union(p));
             return;
         }
@@ -694,6 +753,7 @@ static void parse_top_level(Parser& p, std::vector<Lexer::Declaration>& decls) {
         bool has_body = p.check(Lexer::TokenKind::LCURLY);
         p.pos = saved;
         if (has_body) {
+            LOGX_DEBUG << "  parsing ENUM definition at token " << p.pos;
             decls.push_back(parse_enum(p));
             return;
         }
@@ -706,6 +766,7 @@ static void parse_top_level(Parser& p, std::vector<Lexer::Declaration>& decls) {
         Lexer::Type type = parse_type(p);
 
         if (type.baseType.empty()) {
+            LOGX_DEBUG << "  skipping unrecognized token at " << p.pos;
             p.skip_to_semicolon();
             return;
         }
@@ -714,16 +775,19 @@ static void parse_top_level(Parser& p, std::vector<Lexer::Declaration>& decls) {
             std::string name = p.advance().raw;
 
             if (type.flags & Lexer::Flags::isExtern) {
+                LOGX_DEBUG << "  parsing EXTERN_VARIABLE: " << name;
                 p.match(Lexer::TokenKind::SEMICOLON);
                 decls.push_back(Lexer::ExternVariable(std::move(type), std::move(name)));
                 return;
             }
 
             if (p.check(Lexer::TokenKind::LPAREN)) {
+                LOGX_DEBUG << "  parsing FUNCTION: " << name;
                 decls.push_back(parse_function(p, std::move(type), std::move(name)));
                 return;
             }
 
+            LOGX_DEBUG << "  parsing VARIABLE: " << name;
             decls.push_back(parse_variable(p, std::move(type), std::move(name)));
             return;
         }
@@ -743,6 +807,7 @@ static void parse_top_level(Parser& p, std::vector<Lexer::Declaration>& decls) {
 std::vector<Lexer::Declaration> parse(
     const std::vector<Lexer::Token>& tokens)
 {
+    LOGX_DEBUG << "parsing " << tokens.size() << " tokens";
     Parser p(tokens);
     std::vector<Lexer::Declaration> declarations;
 
@@ -754,6 +819,7 @@ std::vector<Lexer::Declaration> parse(
         try {
             parse_top_level(p, declarations);
         } catch (const std::exception& e) {
+            LOGX_ERROR << "parser error at token " << p.pos << ": " << e.what();
             std::cerr << "parser error: " << e.what() << std::endl;
             p.skip_to_semicolon();
         }
@@ -762,6 +828,7 @@ std::vector<Lexer::Declaration> parse(
             p.advance();
     }
 
+    LOGX_DEBUG << "parsing complete: " << declarations.size() << " declarations";
     return declarations;
 }
 
