@@ -212,7 +212,8 @@ using Declaration =
         IncludeStatement  ,
         ExternVariable    ,
         VariableDefinition,
-        ForwardDeclaration
+        ForwardDeclaration,
+        FunctionPointer
     >;
 
 // ------ Punctuation / Operators ------

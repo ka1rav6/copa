@@ -444,7 +444,7 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
                 p.expect(Lexer::TokenKind::RPAREN, "expected ')'");
                 auto params = parse_param_list(p);
                 p.match(Lexer::TokenKind::SEMICOLON);
-                decls.push_back(Lexer::Typedef(std::move(underlying), std::move(alias)));
+                decls.push_back(Lexer::FunctionPointer{std::move(underlying), std::move(alias), std::move(params)});
                 return;
             }
         }
@@ -716,6 +716,7 @@ std::string declaration_kind_name(const Lexer::Declaration& decl) {
         else if constexpr (std::is_same_v<T, Lexer::ExternVariable>)   return "ExternVariable";
         else if constexpr (std::is_same_v<T, Lexer::VariableDefinition>) return "Variable";
         else if constexpr (std::is_same_v<T, Lexer::ForwardDeclaration>) return "ForwardDecl";
+        else if constexpr (std::is_same_v<T, Lexer::FunctionPointer>)  return "FunctionPointer";
         return "Unknown";
     }, decl);
 }
@@ -807,6 +808,17 @@ void print_declaration(const Lexer::Declaration& decl) {
             if (arg.kind == Lexer::ForwardKind::Union) kw = "union";
             else if (arg.kind == Lexer::ForwardKind::Enum) kw = "enum";
             std::cout << kw << " " << arg.name << ";" << std::endl;
+        }
+        else if constexpr (std::is_same_v<T, Lexer::FunctionPointer>) {
+            print_type(arg.returnType);
+            std::cout << " (*" << arg.name << ")(";
+            for (size_t i = 0; i < arg.params.size(); i++) {
+                if (i > 0) std::cout << ", ";
+                print_type(arg.params[i].dataType);
+                if (arg.params[i].param_name.has_value())
+                    std::cout << " " << *arg.params[i].param_name;
+            }
+            std::cout << ");" << std::endl;
         }
     }, decl);
 }
