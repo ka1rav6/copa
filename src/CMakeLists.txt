@@ -26,11 +26,13 @@ target_link_libraries(give-head
 target_include_directories(lexer
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/lexer
+        ${CMAKE_CURRENT_SOURCE_DIR}/logger
 )
 
 target_include_directories(parser
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/lexer
+        ${CMAKE_CURRENT_SOURCE_DIR}/logger
 )
 
 target_include_directories(give-head
@@ -38,4 +40,5 @@ target_include_directories(give-head
         ${CMAKE_CURRENT_SOURCE_DIR}/lexer
         ${CMAKE_CURRENT_SOURCE_DIR}/generator
         ${CMAKE_CURRENT_SOURCE_DIR}/parser
+        ${CMAKE_CURRENT_SOURCE_DIR}/logger
 )
