@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include "keywords.h"
+#include "logx_linux.h"
 #include <iostream>
 #include <fstream>
 #include <cctype>
@@ -7,9 +8,11 @@
 namespace Lexer{
 
 std::vector<std::string> read_file(const std::string& fileName) {
+    LOGX_DEBUG << "opening file: " << fileName;
     std::vector<std::string> lines;
     std::ifstream file(fileName);
     if (!file.is_open()) {
+        LOGX_ERROR << "could not open file: " << fileName;
         std::cerr << "Error: could not open file: " << fileName << std::endl;
         return lines;
     }
@@ -17,6 +20,7 @@ std::vector<std::string> read_file(const std::string& fileName) {
     while (std::getline(file, line)) {
         lines.push_back(line);
     }
+    LOGX_DEBUG << "read " << lines.size() << " lines from " << fileName;
     return lines;
 }
 
@@ -38,6 +42,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
     std::vector<Token> tokens;
     size_t i = 0;
     size_t len = line.size();
+    LOGX_DEBUG << "tokenising line " << line_num << ": \"" << line << "\"";
 
     while (i < len) {
         // skip whitespace (but not newlines)
@@ -53,6 +58,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
             i++;
             while (i < len && line[i] != '\n')
                 i++;
+            LOGX_DEBUG << "  [line " << line_num << "] PREPROCESSOR: " << line.substr(start, i - start);
             tokens.push_back(make_token(TokenKind::PREPROCESSOR, line, start, i, line_num));
             continue;
         }
@@ -60,6 +66,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
         // ---- single line comment ----
         if (line[i] == '/' && i + 1 < len && line[i + 1] == '/') {
             i = len;
+            LOGX_DEBUG << "  [line " << line_num << "] LINE_COMMENT";
             tokens.push_back(make_token(TokenKind::LINE_COMMENT, line, start, i, line_num));
             continue;
         }
@@ -71,6 +78,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
                 i++;
             if (i < len - 1)
                 i += 2;
+            LOGX_DEBUG << "  [line " << line_num << "] BLOCK_COMMENT";
             tokens.push_back(make_token(TokenKind::BLOCK_COMMENT, line, start, i, line_num));
             continue;
         }
@@ -79,6 +87,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
         if (line[i] == '"') {
             i++;
             skip_string(line, &i, '"');
+            LOGX_DEBUG << "  [line " << line_num << "] STRING_LITERAL: " << line.substr(start, i - start);
             tokens.push_back(make_token(TokenKind::STRING_LITERAL, line, start, i, line_num));
             continue;
         }
@@ -87,6 +96,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
         if (line[i] == '\'') {
             i++;
             skip_string(line, &i, '\'');
+            LOGX_DEBUG << "  [line " << line_num << "] CHAR_LITERAL: " << line.substr(start, i - start);
             tokens.push_back(make_token(TokenKind::CHAR_LITERAL, line, start, i, line_num));
             continue;
         }
@@ -130,6 +140,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
                 i++;
 
             tokens.push_back(make_token(kind, line, start, i, line_num));
+            LOGX_DEBUG << "  [line " << line_num << "] NUMBER: " << line.substr(start, i - start);
             continue;
         }
 
@@ -140,6 +151,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
 
             std::string_view word(line.c_str() + start, i - start);
             TokenKind kind = is_keyword(word) ? TokenKind::KEYWORD : TokenKind::IDENTIFIER;
+            LOGX_DEBUG << "  [line " << line_num << "] " << (kind == TokenKind::KEYWORD ? "KEYWORD" : "IDENTIFIER") << ": " << word;
             tokens.push_back(make_token(kind, line, start, i, line_num));
             continue;
         }
@@ -147,6 +159,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
         // ---- two/three character operators ----
         if (line[i] == '-' && i + 1 < len && line[i + 1] == '>') {
             i += 2;
+            LOGX_DEBUG << "  [line " << line_num << "] ARROW";
             tokens.push_back(make_token(TokenKind::ARROW, line, start, i, line_num));
             continue;
         }
@@ -244,6 +257,7 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
         // ---- ellipsis ----
         if (line[i] == '.' && i + 2 < len && line[i + 1] == '.' && line[i + 2] == '.') {
             i += 3;
+            LOGX_DEBUG << "  [line " << line_num << "] ELLIPSIS";
             tokens.push_back(make_token(TokenKind::ELLIPSIS, line, start, i, line_num));
             continue;
         }
@@ -276,14 +290,17 @@ std::vector<Token> tokenise_line(const std::string& line, size_t line_num) {
             case '<': single = TokenKind::LT;        break;
             case '>': single = TokenKind::GT;        break;
             default:
+                LOGX_WARN << "  [line " << line_num << "] UNKNOWN char: '" << line[i] << "'";
                 i++;
                 tokens.push_back(make_token(TokenKind::UNKNOWN, line, start, i, line_num));
                 continue;
         }
         i++;
+        LOGX_DEBUG << "  [line " << line_num << "] SYMBOL: '" << line[start] << "'";
         tokens.push_back(make_token(single, line, start, i, line_num));
     }
 
+    LOGX_DEBUG << "line " << line_num << " produced " << tokens.size() << " tokens";
     return tokens;
 }
 
