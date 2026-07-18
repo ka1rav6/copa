@@ -25,6 +25,13 @@ cmake --build build
 
 The executable is at `build/src/copa`.
 
+Debug builds include verbose logging output. To build without logs:
+
+```bash
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
 ## Usage
 
 ```bash
