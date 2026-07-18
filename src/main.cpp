@@ -1,6 +1,18 @@
 #include "lexer.h"
 #include "parser.h"
+#include "generator.h"
 #include <iostream>
+
+static std::string derive_header_path(const std::string& filePath) {
+    std::string baseName = filePath;
+    auto slashPos = baseName.find_last_of('/');
+    if (slashPos != std::string::npos)
+        baseName = baseName.substr(slashPos + 1);
+    auto dotPos = baseName.find_last_of('.');
+    if (dotPos != std::string::npos)
+        baseName = baseName.substr(0, dotPos);
+    return baseName + ".h";
+}
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -27,12 +39,9 @@ int main(int argc, char* argv[]) {
     // Parse declarations
     std::vector<Lexer::Declaration> decls = Parser::parse(tokens);
 
-    // Print results
-    std::cout << "=== Parsed " << decls.size() << " declarations ===" << std::endl;
-    for (const auto& decl : decls) {
-        std::cout << "[" << Parser::declaration_kind_name(decl) << "] ";
-        Parser::print_declaration(decl);
-    }
+    // Generate header file
+    std::string headerPath = derive_header_path(fileName);
+    Generator::generate_header(headerPath, decls);
 
     return 0;
 }
