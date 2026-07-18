@@ -43,7 +43,7 @@ static void write_struct_body(std::ostream& out, const std::string& name,
                                const std::string& indent) {
     out << indent << "struct " << name << " {\n";
     for (const auto& f : fields) {
-        out << indent << "    ";
+        out << indent << indent;
         write_type(out, f.type);
         out << " " << f.name << ";\n";
     }
@@ -55,7 +55,7 @@ static void write_union_body(std::ostream& out, const std::string& name,
                               const std::string& indent) {
     out << indent << "union " << name << " {\n";
     for (const auto& f : fields) {
-        out << indent << "    ";
+        out << indent << indent;
         write_type(out, f.type);
         out << " " << f.name << ";\n";
     }
@@ -67,7 +67,7 @@ static void write_enum_body(std::ostream& out, const std::string& name,
                              const std::string& indent) {
     out << indent << "enum " << name << " {\n";
     for (size_t i = 0; i < fields.size(); i++) {
-        out << indent << "    " << fields[i].name;
+        out << indent << indent << fields[i].name;
         if (fields[i].value.has_value())
             out << " = " << *fields[i].value;
         if (i + 1 < fields.size())
@@ -147,7 +147,8 @@ static void write_declaration(
 
 void generate_header(
     const std::string& outputPath,
-    const std::vector<Lexer::Declaration>& decls)
+    const std::vector<Lexer::Declaration>& decls,
+    const FormatOptions& opts)
 {
     std::ofstream out(outputPath);
     if (!out.is_open()) {
@@ -165,12 +166,17 @@ void generate_header(
         baseName = baseName.substr(0, dotPos);
 
     std::string guard = make_include_guard(baseName);
+    std::string indent(opts.indent_width, opts.indent_style == IndentStyle::Tabs ? '\t' : ' ');
 
     out << "/* This header is generated using copa \n"
         << "*  (https://github.com/ka1rav6/copa)\n"
         << "*/\n\n";
-    out << "#ifndef " << guard << "\n";
-    out << "#define " << guard << "\n\n";
+    if (opts.use_pragma_once) {
+        out << "#pragma once\n\n";
+    } else {
+        out << "#ifndef " << guard << "\n";
+        out << "#define " << guard << "\n\n";
+    }
 
     std::set<std::string> emitted_functions;
     std::set<size_t> skip;
@@ -230,7 +236,7 @@ void generate_header(
                     const auto& s = std::get<Lexer::Struct>(prev);
                     out << "typedef struct {\n";
                     for (const auto& f : s.fields) {
-                        out << "    ";
+                        out << indent;
                         write_type(out, f.type);
                         out << " " << f.name << ";\n";
                     }
@@ -243,7 +249,7 @@ void generate_header(
                     const auto& u = std::get<Lexer::Union>(prev);
                     out << "typedef union {\n";
                     for (const auto& f : u.fields) {
-                        out << "    ";
+                        out << indent;
                         write_type(out, f.type);
                         out << " " << f.name << ";\n";
                     }
@@ -256,7 +262,7 @@ void generate_header(
                     const auto& e = std::get<Lexer::Enum>(prev);
                     out << "typedef enum {\n";
                     for (size_t j = 0; j < e.fields.size(); j++) {
-                        out << "    " << e.fields[j].name;
+                        out << indent << e.fields[j].name;
                         if (e.fields[j].value.has_value())
                             out << " = " << *e.fields[j].value;
                         if (j + 1 < e.fields.size())
@@ -285,7 +291,8 @@ void generate_header(
         out << "\n";
     }
 
-    out << "#endif /* " << guard << " */\n";
+    if (!opts.use_pragma_once)
+        out << "#endif /* " << guard << " */\n";
 
     out.close();
     std::cout << "Generated header: " << outputPath << std::endl;

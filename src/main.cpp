@@ -29,7 +29,7 @@ static bool is_c_file(const fs::path& path) {
     return path.extension() == ".c" || path.extension() == ".C";
 }
 
-static int process_file(const std::string& fileName) {
+static int process_file(const std::string& fileName, const Generator::FormatOptions& opts) {
     std::vector<std::string> lines = Lexer::read_file(fileName);
     if (lines.empty()) {
         std::cerr << "Error: no lines read from " << fileName << std::endl;
@@ -45,24 +45,24 @@ static int process_file(const std::string& fileName) {
     std::vector<Lexer::Declaration> decls = Parser::parse(tokens);
 
     std::string headerPath = derive_header_path(fileName);
-    Generator::generate_header(headerPath, decls);
+    Generator::generate_header(headerPath, decls, opts);
     return 0;
 }
 
-static int process_directory(const fs::path& dir, bool recursive) {
+static int process_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts) {
     int exit_code = 0;
     if (recursive) {
         for (const auto& entry : fs::recursive_directory_iterator(dir)) {
             if (!entry.is_regular_file()) continue;
             if (!is_c_file(entry.path())) continue;
-            if (process_file(entry.path().string()) != 0)
+            if (process_file(entry.path().string(), opts) != 0)
                 exit_code = 1;
         }
     } else {
         for (const auto& entry : fs::directory_iterator(dir)) {
             if (!entry.is_regular_file()) continue;
             if (!is_c_file(entry.path())) continue;
-            if (process_file(entry.path().string()) != 0)
+            if (process_file(entry.path().string(), opts) != 0)
                 exit_code = 1;
         }
     }
@@ -86,12 +86,12 @@ static std::map<fs::path, fs::file_time_type> scan_files(const fs::path& dir, bo
     return timestamps;
 }
 
-static void watch_directory(const fs::path& dir, bool recursive) {
+static void watch_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts) {
     std::cerr << "Watching " << dir.string() << " for changes (Ctrl+C to stop)..." << std::endl;
 
     auto prev = scan_files(dir, recursive);
     for (const auto& [path, _] : prev) {
-        process_file(path.string());
+        process_file(path.string(), opts);
     }
 
     while (true) {
@@ -102,7 +102,7 @@ static void watch_directory(const fs::path& dir, bool recursive) {
             auto it = prev.find(path);
             if (it == prev.end() || it->second != mtime) {
                 std::cerr << "Changed: " << path.string() << std::endl;
-                process_file(path.string());
+                process_file(path.string(), opts);
             }
         }
 
@@ -111,7 +111,7 @@ static void watch_directory(const fs::path& dir, bool recursive) {
 }
 
 static void print_usage() {
-    std::cerr << "Usage: copa [-r] [--watch] <file.c | directory>" << std::endl;
+    std::cerr << "Usage: copa [-r] [--watch] [--pragma-once] [--indent <2|4|8>] <file.c | directory>" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -122,6 +122,7 @@ int main(int argc, char* argv[]) {
 
     bool recursive = false;
     bool watch = false;
+    Generator::FormatOptions opts;
     int arg_start = 1;
 
     while (arg_start < argc) {
@@ -131,6 +132,24 @@ int main(int argc, char* argv[]) {
             arg_start++;
         } else if (arg == "--watch") {
             watch = true;
+            arg_start++;
+        } else if (arg == "--pragma-once") {
+            opts.use_pragma_once = true;
+            arg_start++;
+        } else if (arg == "--indent") {
+            if (arg_start + 1 >= argc) {
+                std::cerr << "Error: --indent requires a value (2, 4, or 8)" << std::endl;
+                return 1;
+            }
+            arg_start++;
+            std::string val = argv[arg_start];
+            if (val == "2") opts.indent_width = 2;
+            else if (val == "4") opts.indent_width = 4;
+            else if (val == "8") opts.indent_width = 8;
+            else {
+                std::cerr << "Error: --indent must be 2, 4, or 8" << std::endl;
+                return 1;
+            }
             arg_start++;
         } else {
             break;
@@ -152,10 +171,10 @@ int main(int argc, char* argv[]) {
 
     if (fs::is_directory(targetPath)) {
         if (watch) {
-            watch_directory(targetPath, recursive);
+            watch_directory(targetPath, recursive, opts);
             return 0;
         }
-        return process_directory(targetPath, recursive);
+        return process_directory(targetPath, recursive, opts);
     }
 
     if (watch) {
@@ -163,5 +182,5 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    return process_file(target);
+    return process_file(target, opts);
 }
