@@ -11,17 +11,18 @@
 
 namespace fs = std::filesystem;
 
-static std::string derive_header_path(const std::string& filePath) {
+static std::string derive_header_path(const std::string& filePath, const std::string& outputDir = "") {
+    std::string baseName;
     auto lastSlash = filePath.find_last_of('/');
-    std::string dir = (lastSlash != std::string::npos)
-        ? filePath.substr(0, lastSlash + 1)
-        : "";
-    std::string baseName = (lastSlash != std::string::npos)
+    baseName = (lastSlash != std::string::npos)
         ? filePath.substr(lastSlash + 1)
         : filePath;
     auto dotPos = baseName.find_last_of('.');
     if (dotPos != std::string::npos)
         baseName = baseName.substr(0, dotPos);
+    std::string dir = outputDir;
+    if (!dir.empty() && dir.back() != '/')
+        dir += '/';
     return dir + baseName + ".h";
 }
 
@@ -29,7 +30,7 @@ static bool is_c_file(const fs::path& path) {
     return path.extension() == ".c" || path.extension() == ".C";
 }
 
-static int process_file(const std::string& fileName, const Generator::FormatOptions& opts) {
+static int process_file(const std::string& fileName, const Generator::FormatOptions& opts, const std::string& outputDir = "") {
     std::vector<std::string> lines = Lexer::read_file(fileName);
     if (lines.empty()) {
         std::cerr << "Error: no lines read from " << fileName << std::endl;
@@ -44,7 +45,7 @@ static int process_file(const std::string& fileName, const Generator::FormatOpti
     std::vector<Lexer::Token> tokens = Parser::flatten_tokens(line_tokens);
     std::vector<Lexer::Declaration> decls = Parser::parse(tokens);
 
-    std::string headerPath = derive_header_path(fileName);
+    std::string headerPath = derive_header_path(fileName, outputDir);
     Generator::generate_header(headerPath, decls, opts);
     return 0;
 }
