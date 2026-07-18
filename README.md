@@ -2,7 +2,7 @@
 
 A C header file generator that parses `.c` source files and generates clean, ready-to-use `.h` header files with include guards.
 
-**Version: 0.1.0**
+**Version: 0.1.1**
 
 ## Example
 

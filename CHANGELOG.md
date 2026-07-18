@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.1 (2026-07-19)
+
+### Features
+
+- **Watch mode** (`--watch`) -- Polls a directory every 500ms and regenerates headers when `.c` files are modified. Works with `-r` for recursive watching. Prints changed filenames to stderr.
+
+### Test files
+
+- `test/test_static.c` -- `static` variables, `const`, `volatile`, `static` functions
+- `test/test_arrays.c` -- Multi-dimensional arrays, typedef'd arrays, array initializers
+- `test/test_funcptr.c` -- Function pointer typedefs, function pointer arrays
+- `test/test_structs.c` -- Packed attributes, tree nodes, deeply nested structs
+- `test/test_preproc.c` -- Token concatenation, stringification, variadic macros, `container_of`
+- `test/test_typedefs.c` -- Typedef chains, typedef'd enums, multi-field typedef'd structs
+- `test/test_globals.c` -- Extern with qualifiers, pointer-returning externs
+
 ## v0.1.0 (2026-07-18)
 
 Initial release.
