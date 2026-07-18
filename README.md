@@ -93,7 +93,8 @@ int *get_pointer(const char *name);
 - Generate headers for entire directories
 - Recursive directory traversal
 - Live watch mode
-- Automatic include guards
+- Automatic include guards (or `#pragma once`)
+- Configurable indentation
 - Deduplicated function prototypes
 - Struct, union, and enum support
 - Function pointer typedef support
@@ -220,7 +221,7 @@ cmake --build build
 # Usage
 
 ```
-copa [-r] [--watch] <file.c | directory>
+copa [-r] [--watch] [--pragma-once] [--indent <2|4|8>] <file.c | directory>
 ```
 
 ## Commands
@@ -232,6 +233,15 @@ copa [-r] [--watch] <file.c | directory>
 | `copa -r src/` | Generate headers recursively |
 | `copa --watch src/` | Watch directory for changes |
 | `copa -r --watch src/` | Recursive watch mode |
+| `copa --pragma-once foo.c` | Use `#pragma once` instead of include guards |
+| `copa --indent 2 src/` | Use 2-space indentation |
+
+## Formatting Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--pragma-once` | Use `#pragma once` instead of `#ifndef`/`#define` guards | Include guards |
+| `--indent <N>` | Indent width (2, 4, or 8) | 4 |
 
 Generated headers are written beside their corresponding source files.
 
@@ -413,9 +423,9 @@ enum Color;
 
 ### Generator
 
-- include guards
+- include guards (or `#pragma once`)
 - deduplicated declarations
-- formatting
+- configurable indentation
 - forward declarations
 - anonymous typedef reconstruction
 
@@ -465,10 +475,9 @@ copa -r test/
 
 Planned improvements include
 
-- command-line formatting options
-- configurable include guards
-- optional `#pragma once`
-- better formatting controls
+- configurable include guards (done)
+- optional `#pragma once` (done)
+- better formatting controls (done)
 - support for additional GNU/MSVC extensions
 - incremental parsing
 - faster watch mode
