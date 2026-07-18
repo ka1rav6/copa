@@ -35,10 +35,28 @@ cmake --build build
 ## Usage
 
 ```bash
-./build/src/copa <file.c>
+copa [-r] <file.c | directory>
 ```
 
-This generates `<basename>.h` in the current directory. For example, `./copa src/foo.c` produces `foo.h`.
+**Single file** -- generates the header in the same directory as the source file:
+
+```bash
+./build/src/copa src/foo.c   # produces src/foo.h
+```
+
+**Directory** -- generates headers for all `.c` files in the directory (non-recursive):
+
+```bash
+./build/src/copa src/        # produces src/*.h for each .c file
+```
+
+**Recursive** -- generates headers for all `.c` files in the directory and subdirectories:
+
+```bash
+./build/src/copa -r src/     # processes src/ and all subdirectories
+```
+
+Non-`.c` files are automatically skipped. If a header already exists it is overwritten.
 
 ## What's implemented
 
@@ -82,6 +100,7 @@ This generates `<basename>.h` in the current directory. For example, `./copa src
 Run any test with:
 
 ```bash
-./build/src/copa test/test.c   # produces test.h
-./build/src/copa test/test2.c  # produces test2.h
+./build/src/copa test/test.c      # produces test/test.h
+./build/src/copa test/            # all .c files in test/
+./build/src/copa -r test/         # all .c files recursively (same here, no subdirs)
 ```
