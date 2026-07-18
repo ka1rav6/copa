@@ -50,20 +50,20 @@ static int process_file(const std::string& fileName, const Generator::FormatOpti
     return 0;
 }
 
-static int process_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts) {
+static int process_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts, const std::string& outputDir = "") {
     int exit_code = 0;
     if (recursive) {
         for (const auto& entry : fs::recursive_directory_iterator(dir)) {
             if (!entry.is_regular_file()) continue;
             if (!is_c_file(entry.path())) continue;
-            if (process_file(entry.path().string(), opts) != 0)
+            if (process_file(entry.path().string(), opts, outputDir) != 0)
                 exit_code = 1;
         }
     } else {
         for (const auto& entry : fs::directory_iterator(dir)) {
             if (!entry.is_regular_file()) continue;
             if (!is_c_file(entry.path())) continue;
-            if (process_file(entry.path().string(), opts) != 0)
+            if (process_file(entry.path().string(), opts, outputDir) != 0)
                 exit_code = 1;
         }
     }
@@ -87,12 +87,12 @@ static std::map<fs::path, fs::file_time_type> scan_files(const fs::path& dir, bo
     return timestamps;
 }
 
-static void watch_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts) {
+static void watch_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts, const std::string& outputDir = "") {
     std::cerr << "Watching " << dir.string() << " for changes (Ctrl+C to stop)..." << std::endl;
 
     auto prev = scan_files(dir, recursive);
     for (const auto& [path, _] : prev) {
-        process_file(path.string(), opts);
+        process_file(path.string(), opts, outputDir);
     }
 
     while (true) {
@@ -103,7 +103,7 @@ static void watch_directory(const fs::path& dir, bool recursive, const Generator
             auto it = prev.find(path);
             if (it == prev.end() || it->second != mtime) {
                 std::cerr << "Changed: " << path.string() << std::endl;
-                process_file(path.string(), opts);
+                process_file(path.string(), opts, outputDir);
             }
         }
 
