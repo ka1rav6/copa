@@ -443,6 +443,7 @@ static Lexer::Declaration parse_struct_or_union(Parser& p) {
     if (is_struct) {
         std::vector<Lexer::StructField> fields;
         while (!p.at_end() && !p.check(Lexer::TokenKind::RCURLY)) {
+            size_t loop_start = p.pos;
             Lexer::Type ft = parse_type(p);
 
             // Handle nested anonymous struct/union: { ... } fieldname;
@@ -454,8 +455,34 @@ static Lexer::Declaration parse_struct_or_union(Parser& p) {
             }
 
             std::string fname;
-            if (p.check(Lexer::TokenKind::IDENTIFIER))
+
+            // Function pointer field: (*name)(params)
+            if (p.check(Lexer::TokenKind::LPAREN)) {
+                size_t peek1 = p.pos + 1;
+                if (peek1 < p.tokens.size() &&
+                    p.tokens[peek1].kind == Lexer::TokenKind::STAR)
+                {
+                    p.advance(); // (
+                    p.advance(); // *
+                    if (p.check(Lexer::TokenKind::IDENTIFIER))
+                        fname = p.advance().raw;
+                    p.match(Lexer::TokenKind::RPAREN);
+                    if (p.check(Lexer::TokenKind::LPAREN))
+                        parse_param_list(p);
+                }
+            }
+
+            if (fname.empty() && p.check(Lexer::TokenKind::IDENTIFIER))
                 fname = p.advance().raw;
+
+            // Skip array brackets: name[size]
+            if (p.check(Lexer::TokenKind::LSQUARE)) {
+                p.advance();
+                while (!p.at_end() && !p.check(Lexer::TokenKind::RSQUARE))
+                    p.advance();
+                p.match(Lexer::TokenKind::RSQUARE);
+            }
+
             // Skip bitfield width: field : 8 ;
             if (p.match(Lexer::TokenKind::COLON)) {
                 while (!p.at_end() && !p.check(Lexer::TokenKind::SEMICOLON))
@@ -463,6 +490,8 @@ static Lexer::Declaration parse_struct_or_union(Parser& p) {
             }
             p.match(Lexer::TokenKind::SEMICOLON);
             fields.emplace_back(std::move(ft), std::move(fname));
+
+            if (p.pos == loop_start) p.advance();
         }
         p.expect(Lexer::TokenKind::RCURLY, "expected '}'");
         p.match(Lexer::TokenKind::SEMICOLON);
@@ -470,6 +499,7 @@ static Lexer::Declaration parse_struct_or_union(Parser& p) {
     } else {
         std::vector<Lexer::UnionField> fields;
         while (!p.at_end() && !p.check(Lexer::TokenKind::RCURLY)) {
+            size_t loop_start = p.pos;
             Lexer::Type ft = parse_type(p);
 
             if ((ft.baseType == "struct" || ft.baseType == "union") &&
@@ -480,8 +510,34 @@ static Lexer::Declaration parse_struct_or_union(Parser& p) {
             }
 
             std::string fname;
-            if (p.check(Lexer::TokenKind::IDENTIFIER))
+
+            // Function pointer field: (*name)(params)
+            if (p.check(Lexer::TokenKind::LPAREN)) {
+                size_t peek1 = p.pos + 1;
+                if (peek1 < p.tokens.size() &&
+                    p.tokens[peek1].kind == Lexer::TokenKind::STAR)
+                {
+                    p.advance(); // (
+                    p.advance(); // *
+                    if (p.check(Lexer::TokenKind::IDENTIFIER))
+                        fname = p.advance().raw;
+                    p.match(Lexer::TokenKind::RPAREN);
+                    if (p.check(Lexer::TokenKind::LPAREN))
+                        parse_param_list(p);
+                }
+            }
+
+            if (fname.empty() && p.check(Lexer::TokenKind::IDENTIFIER))
                 fname = p.advance().raw;
+
+            // Skip array brackets: name[size]
+            if (p.check(Lexer::TokenKind::LSQUARE)) {
+                p.advance();
+                while (!p.at_end() && !p.check(Lexer::TokenKind::RSQUARE))
+                    p.advance();
+                p.match(Lexer::TokenKind::RSQUARE);
+            }
+
             // Skip bitfield width
             if (p.match(Lexer::TokenKind::COLON)) {
                 while (!p.at_end() && !p.check(Lexer::TokenKind::SEMICOLON))
@@ -489,6 +545,8 @@ static Lexer::Declaration parse_struct_or_union(Parser& p) {
             }
             p.match(Lexer::TokenKind::SEMICOLON);
             fields.emplace_back(std::move(fname), std::move(ft));
+
+            if (p.pos == loop_start) p.advance();
         }
         p.expect(Lexer::TokenKind::RCURLY, "expected '}'");
         p.match(Lexer::TokenKind::SEMICOLON);
