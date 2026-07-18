@@ -15,16 +15,21 @@
 - [x] C parser: edge cases (bitfields, variadics, nested anonymous types, multi-line)
 
 
+## Phase 3:
+- [x] Header file generator from AST
+- [x] Include guards
+- [x] Deduplicate function declarations (prototype + definition)
+- [x] Combine anonymous typedef struct/union/enum
+
 ## COOL FEATURES PLANNED
---pragma-once
-include guards
-preserve comments
-generate documentation
-detect missing prototypes
-sort declarations alphabetically
-output dependency graph
-generate UML
-color diagnostics
-watch mode
-recursive directory scanning
-parallel parsing
+- [ ] pragma once
+- [ ] preserve comments
+- [ ] generate documentation
+- [ ] detect missing prototypes
+- [ ] sort declarations alphabetically
+- [ ] output dependency graph
+- [ ] generate UML
+- [ ] color diagnostics
+- [ ] watch mode
+- [ ] recursive directory scanning
+- [ ] parallel parsing
