@@ -396,6 +396,24 @@ static bool looks_like_forward_decl(Parser& p) {
 // Struct / Union parsing
 // ---------------------------------------------------------------------------
 
+// Skip __attribute__((...)) sequences (GCC/Clang extension).
+// Expects p to be pointing AT `__attribute__`.
+static void skip_attribute(Parser& p) {
+    if (!p.check_kw("__attribute__"))
+        return;
+    p.advance(); // __attribute__
+    // Expect (( ... ))
+    if (p.match(Lexer::TokenKind::LPAREN)) {
+        int depth = 1;
+        while (!p.at_end() && depth > 0) {
+            if (p.check(Lexer::TokenKind::LPAREN)) depth++;
+            if (p.check(Lexer::TokenKind::RPAREN)) depth--;
+            if (depth > 0) p.advance();
+            else p.advance(); // consume closing )
+        }
+    }
+}
+
 // Skip a brace-delimited block, tracking nesting depth.
 // Expects p to be pointing AT the opening LCURLY.
 static void skip_brace_block(Parser& p) {
@@ -416,6 +434,8 @@ static Lexer::Declaration parse_struct_or_union(Parser& p) {
     std::string name;
     if (p.check(Lexer::TokenKind::IDENTIFIER))
         name = p.advance().raw;
+
+    skip_attribute(p);
 
     LOGX_DEBUG << "    parsing " << (is_struct ? "struct" : "union") << " " << name;
     p.expect(Lexer::TokenKind::LCURLY, "expected '{'");
@@ -736,6 +756,7 @@ static void parse_top_level(Parser& p, std::vector<Lexer::Declaration>& decls) {
         p.advance();
         if (p.check(Lexer::TokenKind::IDENTIFIER))
             p.advance();
+        skip_attribute(p);
         bool has_body = p.check(Lexer::TokenKind::LCURLY);
         p.pos = saved;
         if (has_body) {
