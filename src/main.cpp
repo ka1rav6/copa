@@ -67,7 +67,7 @@ static int process_directory(const fs::path& dir, bool recursive) {
 }
 
 static void print_usage() {
-    std::cerr << "Usage: copa [-r] <file.c | directory>" << std::endl;
+    std::cerr << "Usage: copa [-r] [--watch] <file.c | directory>" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -77,15 +77,25 @@ int main(int argc, char* argv[]) {
     }
 
     bool recursive = false;
+    bool watch = false;
     int arg_start = 1;
 
-    if (std::string(argv[1]) == "-r") {
-        recursive = true;
-        arg_start = 2;
-        if (argc < 3) {
-            print_usage();
-            return 1;
+    while (arg_start < argc) {
+        std::string arg = argv[arg_start];
+        if (arg == "-r") {
+            recursive = true;
+            arg_start++;
+        } else if (arg == "--watch") {
+            watch = true;
+            arg_start++;
+        } else {
+            break;
         }
+    }
+
+    if (arg_start >= argc) {
+        print_usage();
+        return 1;
     }
 
     std::string target = argv[arg_start];
