@@ -93,6 +93,7 @@ int *get_pointer(const char *name);
 - Generate headers for entire directories
 - Recursive directory traversal
 - Live watch mode
+- Output to separate directory (`--target`)
 - Automatic include guards (or `#pragma once`)
 - Configurable indentation
 - Deduplicated function prototypes
@@ -221,7 +222,7 @@ cmake --build build
 # Usage
 
 ```
-copa [-r] [--watch] [--pragma-once] [--indent <2|4|8>] <file.c | directory>
+copa [-r] [--watch] [--pragma-once] [--indent <2|4|8>] [--target <dir>] <file.c | directory>
 ```
 
 ## Commands
@@ -235,17 +236,16 @@ copa [-r] [--watch] [--pragma-once] [--indent <2|4|8>] <file.c | directory>
 | `copa -r --watch src/` | Recursive watch mode |
 | `copa --pragma-once foo.c` | Use `#pragma once` instead of include guards |
 | `copa --indent 2 src/` | Use 2-space indentation |
+| `copa --target include/ src/` | Write headers to `include/` |
+| `copa --watch . --target ../include/` | Watch `.` and write headers to `../include/` |
 
-## Formatting Options
+## Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--pragma-once` | Use `#pragma once` instead of `#ifndef`/`#define` guards | Include guards |
 | `--indent <N>` | Indent width (2, 4, or 8) | 4 |
-
-Generated headers are written beside their corresponding source files.
-
-Existing headers are overwritten.
+| `--target <dir>` | Output directory for generated headers (created if missing) | Same as source |
 
 Non-C files are ignored automatically.
 
