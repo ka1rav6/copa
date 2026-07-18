@@ -149,8 +149,8 @@ struct Union{
 
 struct Macro {
     std::string name;
-    std::optional<std::string> parameters;
     std::string body;
+    std::optional<std::string> parameters;
 
     Macro(
             std::string name,
@@ -163,8 +163,8 @@ struct Macro {
 };
 
 struct IncludeStatement{
-    std::string path;
     bool system;
+    std::string path;
     IncludeStatement(
             bool system,
             std::string path

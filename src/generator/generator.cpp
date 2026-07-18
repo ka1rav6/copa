@@ -40,10 +40,11 @@ static void write_params(std::ostream& out, const std::vector<Lexer::Parameter>&
 
 static void write_struct_body(std::ostream& out, const std::string& name,
                                const std::vector<Lexer::StructField>& fields,
-                               const std::string& indent) {
+                               const std::string& indent,
+                               const std::string& field_indent) {
     out << indent << "struct " << name << " {\n";
     for (const auto& f : fields) {
-        out << indent << indent;
+        out << indent << field_indent;
         write_type(out, f.type);
         out << " " << f.name << ";\n";
     }
@@ -52,10 +53,11 @@ static void write_struct_body(std::ostream& out, const std::string& name,
 
 static void write_union_body(std::ostream& out, const std::string& name,
                               const std::vector<Lexer::UnionField>& fields,
-                              const std::string& indent) {
+                              const std::string& indent,
+                              const std::string& field_indent) {
     out << indent << "union " << name << " {\n";
     for (const auto& f : fields) {
-        out << indent << indent;
+        out << indent << field_indent;
         write_type(out, f.type);
         out << " " << f.name << ";\n";
     }
@@ -64,10 +66,11 @@ static void write_union_body(std::ostream& out, const std::string& name,
 
 static void write_enum_body(std::ostream& out, const std::string& name,
                              const std::vector<Lexer::EnumField>& fields,
-                             const std::string& indent) {
+                             const std::string& indent,
+                             const std::string& field_indent) {
     out << indent << "enum " << name << " {\n";
     for (size_t i = 0; i < fields.size(); i++) {
-        out << indent << indent << fields[i].name;
+        out << indent << field_indent << fields[i].name;
         if (fields[i].value.has_value())
             out << " = " << *fields[i].value;
         if (i + 1 < fields.size())
@@ -80,7 +83,8 @@ static void write_enum_body(std::ostream& out, const std::string& name,
 static void write_declaration(
     std::ostream& out,
     const Lexer::Declaration& decl,
-    const std::string& indent)
+    const std::string& indent,
+    const std::string& field_indent)
 {
     std::visit([&](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
@@ -102,13 +106,13 @@ static void write_declaration(
             out << indent << kw << " " << arg.name << ";\n";
         }
         else if constexpr (std::is_same_v<T, Lexer::Struct>) {
-            write_struct_body(out, arg.name, arg.fields, indent);
+            write_struct_body(out, arg.name, arg.fields, indent, field_indent);
         }
         else if constexpr (std::is_same_v<T, Lexer::Union>) {
-            write_union_body(out, arg.name, arg.fields, indent);
+            write_union_body(out, arg.name, arg.fields, indent, field_indent);
         }
         else if constexpr (std::is_same_v<T, Lexer::Enum>) {
-            write_enum_body(out, arg.name, arg.fields, indent);
+            write_enum_body(out, arg.name, arg.fields, indent, field_indent);
         }
         else if constexpr (std::is_same_v<T, Lexer::Typedef>) {
             out << indent << "typedef ";
@@ -274,7 +278,7 @@ void generate_header(
                 }
             }
             // Fallback: emit as regular typedef
-            write_declaration(out, decl, "");
+            write_declaration(out, decl, "", indent);
             out << "\n";
             continue;
         }
@@ -287,7 +291,7 @@ void generate_header(
             emitted_functions.insert(fn.name);
         }
 
-        write_declaration(out, decl, "");
+        write_declaration(out, decl, "", indent);
         out << "\n";
     }
 

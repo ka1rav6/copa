@@ -264,6 +264,7 @@ static std::string parse_expression(Parser& p) {
     std::string result;
     int brace_depth = 0;
     int paren_depth = 0;
+    int square_depth = 0;
 
     while (!p.at_end()) {
         const auto& tok = p.peek();
@@ -277,7 +278,12 @@ static std::string parse_expression(Parser& p) {
             if (paren_depth == 0) break;
             paren_depth--;
         }
-        if (brace_depth == 0 && paren_depth == 0) {
+        if (tok.kind == Lexer::TokenKind::LSQUARE) square_depth++;
+        if (tok.kind == Lexer::TokenKind::RSQUARE) {
+            if (square_depth == 0) break;
+            square_depth--;
+        }
+        if (brace_depth == 0 && paren_depth == 0 && square_depth == 0) {
             if (tok.kind == Lexer::TokenKind::COMMA ||
                 tok.kind == Lexer::TokenKind::SEMICOLON)
                 break;
@@ -399,7 +405,7 @@ static bool looks_like_forward_decl(Parser& p) {
 // Skip __attribute__((...)) sequences (GCC/Clang extension).
 // Expects p to be pointing AT `__attribute__`.
 static void skip_attribute(Parser& p) {
-    if (!p.check_kw("__attribute__"))
+    if (p.at_end() || p.peek().raw != "__attribute__")
         return;
     p.advance(); // __attribute__
     // Expect (( ... ))
@@ -430,6 +436,8 @@ static void skip_brace_block(Parser& p) {
 static Lexer::Declaration parse_struct_or_union(Parser& p) {
     bool is_struct = p.check_kw("struct");
     p.advance();
+
+    skip_attribute(p);
 
     std::string name;
     if (p.check(Lexer::TokenKind::IDENTIFIER))
@@ -812,6 +820,7 @@ static void parse_top_level(Parser& p, std::vector<Lexer::Declaration>& decls) {
     if (p.check_kw("struct") || p.check_kw("union")) {
         size_t saved = p.pos;
         p.advance();
+        skip_attribute(p);
         if (p.check(Lexer::TokenKind::IDENTIFIER))
             p.advance();
         skip_attribute(p);
@@ -894,7 +903,7 @@ std::vector<Lexer::Declaration> parse(
         if (p.match(Lexer::TokenKind::SEMICOLON))
             continue;
 
-        size_t before = declarations.size();
+        size_t before_pos = p.pos;
         try {
             parse_top_level(p, declarations);
         } catch (const std::exception& e) {
@@ -902,8 +911,12 @@ std::vector<Lexer::Declaration> parse(
             std::cerr << "parser error: " << e.what() << std::endl;
             p.skip_to_semicolon();
         }
-        // If nothing was parsed and we didn't advance, force advance to avoid infinite loop
-        if (declarations.size() == before && !p.at_end())
+        // If the token position didn't move, we're stuck: force advance to avoid an
+        // infinite loop. Comparing declaration count instead of position was wrong:
+        // error-recovery paths (skip_to_semicolon, unrecognized-token skip, etc.) can
+        // legitimately consume tokens without adding a declaration, and force-advancing
+        // on top of that ate the first token of the next declaration, corrupting it.
+        if (p.pos == before_pos && !p.at_end())
             p.advance();
     }
 
