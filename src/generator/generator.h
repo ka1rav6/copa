@@ -7,12 +7,18 @@
 
 namespace Generator {
 
-// Generates a C header file from parsed declarations.
-// outputPath: the .h file to write to.
-// decls: the parsed AST declarations.
+enum class IndentStyle { Spaces, Tabs };
+
+struct FormatOptions {
+    IndentStyle indent_style = IndentStyle::Spaces;
+    int indent_width = 4;
+    bool use_pragma_once = false;
+};
+
 void generate_header(
     const std::string& outputPath,
-    const std::vector<Lexer::Declaration>& decls);
+    const std::vector<Lexer::Declaration>& decls,
+    const FormatOptions& opts = FormatOptions());
 
 } // namespace Generator
 
