@@ -91,7 +91,7 @@ cmake --build build
 ## Usage
 
 ```
-copa [-r] <file.c | directory>
+copa [-r] [--watch] <file.c | directory>
 ```
 
 | Command | Description |
@@ -99,6 +99,8 @@ copa [-r] <file.c | directory>
 | `copa src/foo.c` | Generate `src/foo.h` from `src/foo.c` |
 | `copa src/` | Generate headers for all `.c` files in `src/` |
 | `copa -r src/` | Generate headers for all `.c` files in `src/` and subdirectories |
+| `copa --watch src/` | Watch `src/` and regenerate headers when `.c` files change |
+| `copa -r --watch src/` | Watch `src/` and subdirectories recursively |
 
 - Headers are generated in the **same directory** as the source file.
 - Non-`.c` files are automatically skipped.
@@ -115,6 +117,10 @@ copa [-r] <file.c | directory>
 
 # Recursive
 ./build/src/copa -r project/         # all .c files in project/ and subdirs
+
+# Watch mode -- regenerates headers on file save
+./build/src/copa --watch src/        # watch src/, regenerate on change
+./build/src/copa -r --watch .        # watch entire project recursively
 ```
 
 ## What's implemented in v0.1.0
