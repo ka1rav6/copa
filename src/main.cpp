@@ -112,7 +112,7 @@ static void watch_directory(const fs::path& dir, bool recursive, const Generator
 }
 
 static void print_usage() {
-    std::cerr << "Usage: copa [-r] [--watch] [--pragma-once] [--indent <2|4|8>] <file.c | directory>" << std::endl;
+    std::cerr << "Usage: copa [-r] [--watch] [--pragma-once] [--indent <2|4|8>] [--target <dir>] <file.c | directory>" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -123,6 +123,7 @@ int main(int argc, char* argv[]) {
 
     bool recursive = false;
     bool watch = false;
+    std::string outputDir;
     Generator::FormatOptions opts;
     int arg_start = 1;
 
@@ -152,6 +153,14 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
             arg_start++;
+        } else if (arg == "--target") {
+            if (arg_start + 1 >= argc) {
+                std::cerr << "Error: --target requires a directory path" << std::endl;
+                return 1;
+            }
+            arg_start++;
+            outputDir = argv[arg_start];
+            arg_start++;
         } else {
             break;
         }
@@ -162,20 +171,29 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::string target = argv[arg_start];
-    fs::path targetPath(target);
+    if (!outputDir.empty()) {
+        std::error_code ec;
+        fs::create_directories(outputDir, ec);
+        if (ec) {
+            std::cerr << "Error: cannot create output directory " << outputDir << ": " << ec.message() << std::endl;
+            return 1;
+        }
+    }
 
-    if (!fs::exists(targetPath)) {
-        std::cerr << "Error: " << target << " does not exist" << std::endl;
+    std::string sourcePath = argv[arg_start];
+    fs::path sourcePathObj(sourcePath);
+
+    if (!fs::exists(sourcePathObj)) {
+        std::cerr << "Error: " << sourcePath << " does not exist" << std::endl;
         return 1;
     }
 
-    if (fs::is_directory(targetPath)) {
+    if (fs::is_directory(sourcePathObj)) {
         if (watch) {
-            watch_directory(targetPath, recursive, opts);
+            watch_directory(sourcePathObj, recursive, opts, outputDir);
             return 0;
         }
-        return process_directory(targetPath, recursive, opts);
+        return process_directory(sourcePathObj, recursive, opts, outputDir);
     }
 
     if (watch) {
@@ -183,5 +201,5 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    return process_file(target, opts);
+    return process_file(sourcePath, opts, outputDir);
 }
