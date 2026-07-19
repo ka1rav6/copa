@@ -2,6 +2,7 @@
 #include "parser.h"
 #include "generator.h"
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <filesystem>
@@ -51,7 +52,118 @@ static bool is_excluded(const fs::path& path, const std::vector<std::string>& ex
     return false;
 }
 
-static int process_file(const std::string& fileName, const Generator::FormatOptions& opts, const std::string& outputDir = "", const std::vector<std::string>& excludes = {}) {
+static bool is_removable(const Lexer::Declaration& decl) {
+    return std::visit([](auto&& arg) -> bool {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, Lexer::IncludeStatement>)  return true;
+        else if constexpr (std::is_same_v<T, Lexer::Macro>)        return true;
+        else if constexpr (std::is_same_v<T, Lexer::Typedef>)      return true;
+        else if constexpr (std::is_same_v<T, Lexer::Struct>)       return true;
+        else if constexpr (std::is_same_v<T, Lexer::Union>)        return true;
+        else if constexpr (std::is_same_v<T, Lexer::Enum>)         return true;
+        else if constexpr (std::is_same_v<T, Lexer::ExternVariable>)   return true;
+        else if constexpr (std::is_same_v<T, Lexer::ForwardDeclaration>) return true;
+        else if constexpr (std::is_same_v<T, Lexer::FunctionPointer>)  return true;
+        else if constexpr (std::is_same_v<T, Lexer::VariableDefinition>) return true;
+        else if constexpr (std::is_same_v<T, Lexer::Function>) {
+            return !arg.has_body;
+        }
+        return false;
+    }, decl);
+}
+
+static void move_definitions_to_header(
+    const std::string& fileName,
+    const std::string& headerPath,
+    const std::vector<Lexer::DeclarationRange>& ranges)
+{
+    std::ifstream infile(fileName);
+    if (!infile.is_open()) {
+        std::cerr << "Error: cannot open " << fileName << " for reading" << std::endl;
+        return;
+    }
+
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(infile, line))
+        lines.push_back(line);
+    infile.close();
+
+    // Collect 1-indexed line numbers to remove
+    std::vector<size_t> lines_to_remove;
+    for (const auto& range : ranges) {
+        if (!is_removable(range.decl)) continue;
+        for (size_t ln = range.start_line; ln <= range.end_line; ln++)
+            lines_to_remove.push_back(ln);
+    }
+
+    // Deduplicate
+    std::sort(lines_to_remove.begin(), lines_to_remove.end());
+    lines_to_remove.erase(
+        std::unique(lines_to_remove.begin(), lines_to_remove.end()),
+        lines_to_remove.end());
+
+    // Find the include insertion point: after the last existing #include
+    size_t insert_after = 0;
+    for (size_t i = 0; i < lines.size(); i++) {
+        std::string trimmed = lines[i];
+        // Skip leading whitespace
+        size_t first_non_space = trimmed.find_first_not_of(" \t");
+        if (first_non_space != std::string::npos)
+            trimmed = trimmed.substr(first_non_space);
+        if (trimmed.rfind("#include", 0) == 0)
+            insert_after = i + 1;
+    }
+
+    // Build new file content
+    std::vector<std::string> new_lines;
+    std::string include_line = "#include \"" + fs::path(headerPath).filename().string() + "\"";
+    bool include_added = false;
+
+    for (size_t i = 0; i < lines.size(); i++) {
+        size_t line_num = i + 1;
+        if (std::binary_search(lines_to_remove.begin(), lines_to_remove.end(), line_num))
+            continue;
+
+        new_lines.push_back(lines[i]);
+
+        if (!include_added && i + 1 == insert_after) {
+            new_lines.push_back(include_line);
+            include_added = true;
+        }
+    }
+
+    // If we never found an #include, insert at the top
+    if (!include_added) {
+        new_lines.insert(new_lines.begin(), include_line);
+    }
+
+    // Collapse consecutive blank lines into at most one
+    std::vector<std::string> cleaned;
+    bool prev_blank = false;
+    for (const auto& l : new_lines) {
+        bool blank = l.empty() ||
+            (l.find_first_not_of(" \t") == std::string::npos);
+        if (blank && prev_blank) continue;
+        cleaned.push_back(l);
+        prev_blank = blank;
+    }
+
+    // Write back
+    std::ofstream outfile(fileName);
+    if (!outfile.is_open()) {
+        std::cerr << "Error: cannot open " << fileName << " for writing" << std::endl;
+        return;
+    }
+    for (size_t i = 0; i < cleaned.size(); i++) {
+        outfile << cleaned[i];
+        if (i + 1 < cleaned.size()) outfile << "\n";
+    }
+    outfile.close();
+    std::cout << "Moved definitions from " << fileName << " to " << headerPath << std::endl;
+}
+
+static int process_file(const std::string& fileName, const Generator::FormatOptions& opts, const std::string& outputDir = "", const std::vector<std::string>& excludes = {}, bool move = false) {
     if (is_excluded(fs::path(fileName), excludes)) return 0;
 
     std::vector<std::string> lines = Lexer::read_file(fileName);
@@ -66,21 +178,30 @@ static int process_file(const std::string& fileName, const Generator::FormatOpti
     }
 
     std::vector<Lexer::Token> tokens = Parser::flatten_tokens(line_tokens);
-    std::vector<Lexer::Declaration> decls = Parser::parse(tokens);
 
     std::string headerPath = derive_header_path(fileName, outputDir);
-    Generator::generate_header(headerPath, decls, opts);
+
+    if (move) {
+        auto ranges = Parser::parse_with_ranges(tokens);
+        std::vector<Lexer::Declaration> decls;
+        for (const auto& r : ranges) decls.push_back(r.decl);
+        Generator::generate_header(headerPath, decls, opts);
+        move_definitions_to_header(fileName, headerPath, ranges);
+    } else {
+        std::vector<Lexer::Declaration> decls = Parser::parse(tokens);
+        Generator::generate_header(headerPath, decls, opts);
+    }
     return 0;
 }
 
-static int process_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts, const std::string& outputDir = "", const std::vector<std::string>& excludes = {}) {
+static int process_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts, const std::string& outputDir = "", const std::vector<std::string>& excludes = {}, bool move = false) {
     int exit_code = 0;
     if (recursive) {
         for (const auto& entry : fs::recursive_directory_iterator(dir)) {
             if (!entry.is_regular_file()) continue;
             if (!is_c_file(entry.path())) continue;
             if (is_excluded(entry.path(), excludes)) continue;
-            if (process_file(entry.path().string(), opts, outputDir, excludes) != 0)
+            if (process_file(entry.path().string(), opts, outputDir, excludes, move) != 0)
                 exit_code = 1;
         }
     } else {
@@ -88,7 +209,7 @@ static int process_directory(const fs::path& dir, bool recursive, const Generato
             if (!entry.is_regular_file()) continue;
             if (!is_c_file(entry.path())) continue;
             if (is_excluded(entry.path(), excludes)) continue;
-            if (process_file(entry.path().string(), opts, outputDir, excludes) != 0)
+            if (process_file(entry.path().string(), opts, outputDir, excludes, move) != 0)
                 exit_code = 1;
         }
     }
@@ -113,12 +234,12 @@ static std::map<fs::path, fs::file_time_type> scan_files(const fs::path& dir, bo
     return timestamps;
 }
 
-static void watch_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts, const std::string& outputDir = "", const std::vector<std::string>& excludes = {}) {
+static void watch_directory(const fs::path& dir, bool recursive, const Generator::FormatOptions& opts, const std::string& outputDir = "", const std::vector<std::string>& excludes = {}, bool move = false) {
     std::cerr << "Watching " << dir.string() << " for changes (Ctrl+C to stop)..." << std::endl;
 
     auto prev = scan_files(dir, recursive, excludes);
     for (const auto& [path, _] : prev) {
-        process_file(path.string(), opts, outputDir, excludes);
+        process_file(path.string(), opts, outputDir, excludes, move);
     }
 
     while (true) {
@@ -129,7 +250,7 @@ static void watch_directory(const fs::path& dir, bool recursive, const Generator
             auto it = prev.find(path);
             if (it == prev.end() || it->second != mtime) {
                 std::cerr << "Changed: " << path.string() << std::endl;
-                process_file(path.string(), opts, outputDir, excludes);
+                process_file(path.string(), opts, outputDir, excludes, move);
             }
         }
 
@@ -138,7 +259,7 @@ static void watch_directory(const fs::path& dir, bool recursive, const Generator
 }
 
 static void print_usage() {
-    std::cerr << "Usage: copa [-r] [--watch] [--pragma-once] [--indent <2|4|8>] [--target <dir>] [--exclude <pattern>] <file.c | directory>" << std::endl;
+    std::cerr << "Usage: copa [-r] [--watch] [--move] [--pragma-once] [--indent <2|4|8>] [--target <dir>] [--exclude <pattern>] <file.c | directory>" << std::endl;
 }
 
 static void print_help() {
@@ -150,6 +271,7 @@ static void print_help() {
     std::cout << "  -h, --help              Show this help message" << std::endl;
     std::cout << "  -r                      Recursively process directories" << std::endl;
     std::cout << "  --watch                 Watch directory for changes (requires directory)" << std::endl;
+    std::cout << "  --move                  Move definitions to header, remove from source" << std::endl;
     std::cout << "  --pragma-once           Use #pragma once instead of include guards" << std::endl;
     std::cout << "  --indent <2|4|8>        Set indentation width (default: 4)" << std::endl;
     std::cout << "  --target <dir>          Output directory for generated headers" << std::endl;
@@ -166,6 +288,7 @@ static void print_help() {
     std::cout << "Examples:" << std::endl;
     std::cout << "  copa src/main.c                     Generate header for a single file" << std::endl;
     std::cout << "  copa -r src/                        Generate headers for all .c files in src/" << std::endl;
+    std::cout << "  copa --move src/main.c              Move definitions to header, update source" << std::endl;
     std::cout << "  copa -r --exclude test_* src/       Exclude test files from generation" << std::endl;
     std::cout << "  copa -r --target include/ src/      Output headers to include/ directory" << std::endl;
 }
@@ -178,6 +301,7 @@ int main(int argc, char* argv[]) {
 
     bool recursive = false;
     bool watch = false;
+    bool move = false;
     std::string outputDir;
     std::vector<std::string> excludes;
     Generator::FormatOptions opts;
@@ -228,6 +352,9 @@ int main(int argc, char* argv[]) {
             arg_start++;
             excludes.push_back(argv[arg_start]);
             arg_start++;
+        } else if (arg == "--move") {
+            move = true;
+            arg_start++;
         } else {
             break;
         }
@@ -257,10 +384,10 @@ int main(int argc, char* argv[]) {
 
     if (fs::is_directory(sourcePathObj)) {
         if (watch) {
-            watch_directory(sourcePathObj, recursive, opts, outputDir, excludes);
+            watch_directory(sourcePathObj, recursive, opts, outputDir, excludes, move);
             return 0;
         }
-        return process_directory(sourcePathObj, recursive, opts, outputDir, excludes);
+        return process_directory(sourcePathObj, recursive, opts, outputDir, excludes, move);
     }
 
     if (watch) {
@@ -268,5 +395,5 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    return process_file(sourcePath, opts, outputDir, excludes);
+    return process_file(sourcePath, opts, outputDir, excludes, move);
 }
