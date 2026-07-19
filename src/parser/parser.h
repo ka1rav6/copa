@@ -16,6 +16,10 @@ std::vector<Lexer::Token> flatten_tokens(
 std::vector<Lexer::Declaration> parse(
     const std::vector<Lexer::Token>& tokens);
 
+// Like parse(), but also returns source line ranges for each declaration.
+std::vector<Lexer::DeclarationRange> parse_with_ranges(
+    const std::vector<Lexer::Token>& tokens);
+
 // Returns a human-readable name for a Declaration variant.
 std::string declaration_kind_name(const Lexer::Declaration& decl);
 

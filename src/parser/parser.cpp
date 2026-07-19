@@ -924,6 +924,45 @@ std::vector<Lexer::Declaration> parse(
     return declarations;
 }
 
+std::vector<Lexer::DeclarationRange> parse_with_ranges(
+    const std::vector<Lexer::Token>& tokens)
+{
+    LOGX_DEBUG << "parsing " << tokens.size() << " tokens (with ranges)";
+    Parser p(tokens);
+    std::vector<Lexer::Declaration> declarations;
+    std::vector<Lexer::DeclarationRange> results;
+
+    while (!p.at_end()) {
+        if (p.match(Lexer::TokenKind::SEMICOLON))
+            continue;
+
+        size_t before_pos = p.pos;
+        size_t start_line = tokens[before_pos].line_num;
+        size_t end_line = start_line;
+        size_t decl_before = declarations.size();
+        try {
+            parse_top_level(p, declarations);
+        } catch (const std::exception& e) {
+            LOGX_ERROR << "parser error at token " << p.pos << ": " << e.what();
+            std::cerr << "parser error: " << e.what() << std::endl;
+            p.skip_to_semicolon();
+        }
+        size_t decl_after = declarations.size();
+        if (decl_after > decl_before) {
+            if (p.pos > before_pos)
+                end_line = tokens[p.pos - 1].line_num;
+            for (size_t i = decl_before; i < decl_after; i++) {
+                results.push_back({declarations[i], start_line, end_line});
+            }
+        }
+        if (p.pos == before_pos && !p.at_end())
+            p.advance();
+    }
+
+    LOGX_DEBUG << "parsing complete: " << results.size() << " declarations (with ranges)";
+    return results;
+}
+
 // ---------------------------------------------------------------------------
 // Declaration helpers
 // ---------------------------------------------------------------------------

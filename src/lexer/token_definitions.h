@@ -216,6 +216,12 @@ using Declaration =
         FunctionPointer
     >;
 
+struct DeclarationRange {
+    Declaration decl;
+    size_t start_line;
+    size_t end_line;
+};
+
 // ------ Punctuation / Operators ------
 enum class Symbols : uint8_t {
     // ------- Brackets -------
