@@ -42,6 +42,7 @@ struct Function {
     std::vector<Parameter> params;
     Type returnType;
     uint8_t flags = 0;
+    bool has_body = false;
 
     Function(
         std::string name,

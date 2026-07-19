@@ -774,7 +774,9 @@ static Lexer::Declaration parse_function(Parser& p, Lexer::Type return_type, std
             if (p.check(Lexer::TokenKind::RCURLY)) depth--;
             p.advance();
         } while (!p.at_end() && depth > 0);
-        return Lexer::Function(std::move(name), std::move(params), std::move(return_type));
+        Lexer::Function fn(std::move(name), std::move(params), std::move(return_type));
+        fn.has_body = true;
+        return fn;
     }
 
     return Lexer::Function(std::move(name), std::move(params), std::move(return_type));
