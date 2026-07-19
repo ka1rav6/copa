@@ -296,6 +296,25 @@ static std::string parse_expression(Parser& p) {
 }
 
 // ---------------------------------------------------------------------------
+// Array-dimension suffix parsing: consumes zero or more [expr] groups and
+// returns them concatenated as raw text (e.g. "[4][4]"), so callers can
+// preserve the original array declarator instead of collapsing it into a
+// pointer or silently dropping it.
+// ---------------------------------------------------------------------------
+static std::string parse_array_dims(Parser& p) {
+    std::string dims;
+    while (p.check(Lexer::TokenKind::LSQUARE)) {
+        p.advance();
+        dims += "[";
+        while (!p.check(Lexer::TokenKind::RSQUARE) && !p.at_end())
+            dims += p.advance().raw;
+        p.expect(Lexer::TokenKind::RSQUARE, "expected ']'");
+        dims += "]";
+    }
+    return dims;
+}
+
+// ---------------------------------------------------------------------------
 // Macro / include parsing (re-parse the PREPROCESSOR token's raw text)
 // ---------------------------------------------------------------------------
 
@@ -729,10 +748,11 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
         return;
     }
 
-    // Regular typedef: typedef int MyInt;
+    // Regular typedef: typedef int MyInt;  (also: typedef int Matrix[4][4];)
     std::string alias;
     if (p.check(Lexer::TokenKind::IDENTIFIER))
         alias = p.advance().raw;
+    alias += parse_array_dims(p);
     p.match(Lexer::TokenKind::SEMICOLON);
     decls.push_back(Lexer::Typedef(std::move(underlying), std::move(alias)));
 }
