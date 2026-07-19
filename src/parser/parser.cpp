@@ -623,6 +623,25 @@ static void parse_typedef(Parser& p, std::vector<Lexer::Declaration>& decls) {
                 p.expect(Lexer::TokenKind::STAR, "expected '*'");
                 std::string alias = p.advance().raw;
                 p.expect(Lexer::TokenKind::RPAREN, "expected ')'");
+
+                // Pointer-to-array typedef: typedef RetType (*alias)[N];
+                // (as opposed to a function pointer typedef, which is
+                // followed by a parameter list in parentheses).
+                if (p.check(Lexer::TokenKind::LSQUARE)) {
+                    std::string arrayAlias = "(*" + alias + ")";
+                    while (p.match(Lexer::TokenKind::LSQUARE)) {
+                        arrayAlias += "[";
+                        while (!p.check(Lexer::TokenKind::RSQUARE) && !p.at_end())
+                            arrayAlias += p.advance().raw;
+                        p.expect(Lexer::TokenKind::RSQUARE, "expected ']'");
+                        arrayAlias += "]";
+                    }
+                    LOGX_DEBUG << "    parse_typedef: pointer-to-array -> " << arrayAlias;
+                    p.match(Lexer::TokenKind::SEMICOLON);
+                    decls.push_back(Lexer::Typedef(std::move(underlying), std::move(arrayAlias)));
+                    return;
+                }
+
                 auto params = parse_param_list(p);
                 LOGX_DEBUG << "    parse_typedef: function pointer -> " << alias;
                 p.match(Lexer::TokenKind::SEMICOLON);
