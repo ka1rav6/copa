@@ -333,11 +333,85 @@ static std::vector<Lexer::Parameter> parse_param_list(Parser& p) {
 // Expression parsing (minimal — collects tokens until a delimiter)
 // ---------------------------------------------------------------------------
 
+// True for tokens that should never have a space *before* them when
+// joining an expression back into text (closing punctuation and member
+// access).
+static bool expr_no_space_before(Lexer::TokenKind k) {
+    switch (k) {
+        case Lexer::TokenKind::RPAREN:
+        case Lexer::TokenKind::RSQUARE:
+        case Lexer::TokenKind::COMMA:
+        case Lexer::TokenKind::SEMICOLON:
+        case Lexer::TokenKind::DOT:
+        case Lexer::TokenKind::ARROW:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// True for tokens that should never have a space *after* them (opening
+// punctuation and member access).
+static bool expr_no_space_after(Lexer::TokenKind k) {
+    switch (k) {
+        case Lexer::TokenKind::LPAREN:
+        case Lexer::TokenKind::LSQUARE:
+        case Lexer::TokenKind::DOT:
+        case Lexer::TokenKind::ARROW:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// True when token kind `k` puts the parser in a position where an
+// operand (rather than a binary operator) is expected next -- i.e. a
+// following +/-/!/~ should be read as unary and glued to its operand
+// instead of separated by a space.
+static bool expr_expects_operand_next(Lexer::TokenKind k) {
+    switch (k) {
+        case Lexer::TokenKind::LPAREN:
+        case Lexer::TokenKind::LSQUARE:
+        case Lexer::TokenKind::LCURLY:
+        case Lexer::TokenKind::COMMA:
+        case Lexer::TokenKind::COLON:
+        case Lexer::TokenKind::QUESTION:
+        case Lexer::TokenKind::EQUALS:
+        case Lexer::TokenKind::PLUS:
+        case Lexer::TokenKind::MINUS:
+        case Lexer::TokenKind::STAR:
+        case Lexer::TokenKind::SLASH:
+        case Lexer::TokenKind::PERCENT:
+        case Lexer::TokenKind::AMPERSAND:
+        case Lexer::TokenKind::PIPE:
+        case Lexer::TokenKind::CARET:
+        case Lexer::TokenKind::BANG:
+        case Lexer::TokenKind::TILDE:
+        case Lexer::TokenKind::LT:
+        case Lexer::TokenKind::GT:
+        case Lexer::TokenKind::EQ_EQ:
+        case Lexer::TokenKind::BANG_EQ:
+        case Lexer::TokenKind::LT_EQ:
+        case Lexer::TokenKind::GT_EQ:
+        case Lexer::TokenKind::AMP_AMP:
+        case Lexer::TokenKind::PIPE_PIPE:
+        case Lexer::TokenKind::LT_LT:
+        case Lexer::TokenKind::GT_GT:
+            return true;
+        default:
+            return false;
+    }
+}
+
 static std::string parse_expression(Parser& p) {
     std::string result;
     int brace_depth = 0;
     int paren_depth = 0;
     int square_depth = 0;
+
+    bool have_prev = false;
+    Lexer::TokenKind prev_kind{};
+    bool prev_was_unary = false; // previous token was a unary op glued to what follows
 
     while (!p.at_end()) {
         const auto& tok = p.peek();
@@ -361,8 +435,23 @@ static std::string parse_expression(Parser& p) {
                 tok.kind == Lexer::TokenKind::SEMICOLON)
                 break;
         }
-        if (!result.empty()) result += ' ';
+
+        bool is_unary_here =
+            (tok.kind == Lexer::TokenKind::PLUS || tok.kind == Lexer::TokenKind::MINUS ||
+             tok.kind == Lexer::TokenKind::BANG || tok.kind == Lexer::TokenKind::TILDE) &&
+            (!have_prev || expr_expects_operand_next(prev_kind));
+
+        bool want_space = !result.empty();
+        if (expr_no_space_before(tok.kind)) want_space = false;
+        if (have_prev && expr_no_space_after(prev_kind)) want_space = false;
+        if (prev_was_unary) want_space = false;
+
+        if (want_space) result += ' ';
         result += tok.raw;
+
+        prev_was_unary = is_unary_here;
+        have_prev = true;
+        prev_kind = tok.kind;
         p.advance();
     }
     return result;
